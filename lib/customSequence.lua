@@ -137,7 +137,13 @@ function SimultaneousCall(num, ...)
     Globals[num] = 0
     for _, f in ipairs(data.funcs) do
         local s = CyrSeq()
-        s = _G[f.func](s, table.unpack(f.args))
+        if(string.find(f.func, "CyrSequence.", 1, true) == 1) then
+            local fname = string.sub(f.func, string.len("CyrSequence.") + 1)
+            print("calling CyrSequence." .. fname .. "(..)")
+            s = s[fname](table.unpack(f.args))
+        else
+            s = _G[f.func](s, table.unpack(f.args))
+        end
         s
             :Then()
             :Call("WhenAllReady", num, max, data.rest)
