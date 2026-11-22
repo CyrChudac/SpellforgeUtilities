@@ -1,0 +1,2638 @@
+--- original/lib/ambush.lua
++++ migrated/lib/ambush.lua
+@@ -1,32 +1,34 @@
+-require("lib/common")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ FoA = {
+   Animations = {
+-    butterflyMid1 = 9,
+-    butterflyMid2 = 10,
+-    butterflyWest = 11,
+-    birdNorth = 12,
++    butterflyMid1 = Actors["Animation_9"],
++    butterflyMid2 = Actors["Animation_10"],
++    butterflyWest = Actors["Animation_11"],
++    birdNorth = Actors["Animation_12"],
+   }
+ }
+ 
+ FoB = {
+   Animations = {
+-    butterflyNorthEast1 = 8,
+-    butterflyNorthEast2 = 9,
+-    butterflySouth1 = 10,
+-    butterflySouth2 = 11,
+-    butterflySouth3 = 12,
+-    butterflyWest1 = 13,
+-    butterflyWest2 = 14,
++    butterflyNorthEast1 = Actors["Animation_8"],
++    butterflyNorthEast2 = Actors["Animation_9"],
++    butterflySouth1 = Actors["Animation_10"],
++    butterflySouth2 = Actors["Animation_11"],
++    butterflySouth3 = Actors["Animation_12"],
++    butterflyWest1 = Actors["Animation_13"],
++    butterflyWest2 = Actors["Animation_14"],
+   }
+ }
+ 
+ FoC = {
+   Animations = {
+-    butterflyNorth = 11,
+-    butterflyMid1 = 12,
+-    butterflyMid2 = 13,
+-    birdNorth = 14,
++    butterflyNorth = Actors["Animation_11"],
++    butterflyMid1 = Actors["Animation_12"],
++    butterflyMid2 = Actors["Animation_13"],
++    birdNorth = Actors["Animation_14"],
+   }
+ }
+ 
+@@ -42,7 +44,7 @@
+ ---@param patch pointer The patch that would be applied when the PC stands up from leaves
+ function PreparePlaceholderForAmbush(placeholder, patch)
+   if IsNull(placeholder) then
+-    SetPatchAnimationActive(patch, false)
++    patch:SetAnimationActive(false)
+   end
+ end
+ 
+@@ -60,7 +62,7 @@
+       if not Globals[g] then
+         if action == AnimationAction.underLeavesOff then
+           Globals[g] = true
+-          ApplyPatch(GetPatchScript(patch))
++          patch:Apply()
+         end
+       end
+     end,
+@@ -84,13 +86,13 @@
+ 
+     Enter = function(actor)
+       if not Globals[g] then
+-        if not IsActorRider(actor) then
+-          if not IsActorPC(actor) then
+-            if GetAIAttitude(actor) == 1 then
++        if not actor.is_rider then
++          if not actor.is_hero then
++            if actor.attitude == 1 then
+               Globals[g] = true
+-              ApplyPatch(GetPatchScript(patch))
++              patch:Apply()
+               DeactivateInside(actor)
+-              ConfiscateMoney(actor)
++              actor:ConfiscateMoney()
+               SetActorLocation(actor, NoWhere())
+               AddRepulsivePoint(GetLocation(middle), 30, 10, BitwiseOr(2, 4))
+             end
+@@ -185,8 +187,8 @@
+       if not Globals[g] then
+         Globals[g] = true
+   
+-        ApplyPatch(GetPatchScript(patchVisual))
+-        ApplyPatch(GetPatchScript(patchMotion))
++        patchVisual:Apply()
++        patchMotion:Apply()
+   
+         for _, a in ipairs(archers) do
+           SetActorLocation(GetActor(a.man), GetLocation(a.location))
+@@ -244,7 +246,7 @@
+         SequencePlayAnimFreeze(GetActor(target3), AnimationAction.sittingToStanding)
+         Then()
+         SequenceCall(function ()
+-          ApplyPatch(GetPatchScript(visualPatch))
++          visualPatch:Apply()
+         end)
+         EndSequence()
+ 
+@@ -252,7 +254,7 @@
+         SequenceTimer(60)
+         Then()
+         SequenceCall(function ()
+-          ApplyPatch(GetPatchScript(motionPatch))
++          motionPatch:Apply()
+         end)
+         EndSequence()
+ 
+@@ -322,12 +324,12 @@
+         end
+         EndSequence()
+         if Globals[g] > 0 then
+-          ApplyPatch(GetPatchScript(fullTrapPatch))
++          fullTrapPatch:Apply()
+           TrapVanishNPCs(GetLocation(zone))
+         else
+-          ApplyPatch(GetPatchScript(emptyTrapPatch))
+-        end
+-        ApplyPatch(GetPatchScript(leavesPatch))
++          emptyTrapPatch:Apply()
++        end
++        leavesPatch:Apply()
+       end,
+     },
+     Zone = {
+@@ -367,7 +369,7 @@
+         SequencePlayAnimFreeze(GetActor(rockTargetAnim), AnimationAction.sittingToStanding)
+         Then()
+         SequenceCall(function ()
+-          ApplyPatch(GetPatchScript(previousStoneLocPatch))
++          previousStoneLocPatch:Apply()
+         end)
+         EndSequence()
+   
+@@ -375,8 +377,8 @@
+         SequenceTimer(60)
+         Then()
+         SequenceCall(function ()
+-          ApplyPatch(GetPatchScript(walkPatchOrigPos))
+-          ApplyPatch(GetPatchScript(walkPatchNewPos))
++          walkPatchOrigPos:Apply()
++          walkPatchNewPos:Apply()
+           if not (noiseLoc == nil) then
+             MakeNoise(GetLocation(noiseLoc), 0)
+           end
+@@ -401,21 +403,21 @@
+ ---@param zone pointer The zone to vanish actors in.
+ function TrapVanishNPCs(zone)
+   for i = 0,(GetNumberOfActorsInEngine() - 1) do
+-    local a = GetActorScript(i)
++    local a = i
+     if not IsNull(a) then
+-      if IsInside(a, zone) then
++      if a:IsInside(zone) then
+         print(i .. " 0")
+-        if not IsActorRider(a) then
++        if not a.is_rider then
+           print(i .. " 1")
+-          if IsActorPC(a) then
+-            Deactivate(a)
++          if a.is_hero then
++            a:Deactivate()
+             print(i .. " 20")
+           else
+             print(i .. " 21")
+-            if GetAIAttitude(a) == 1 then
++            if a.attitude == 1 then
+               print(i .. " 22")
+               DeactivateInside(a)
+-              ConfiscateMoney(a)
++              a:ConfiscateMoney()
+               SetActorLocation(a, NoWhere())
+             end
+           end
+@@ -429,10 +431,10 @@
+ ---@param zone pointer The zone to kill everyone in.
+ function KillActorsInZone(zone)
+   for i = 0,(GetNumberOfActorsInEngine() - 1) do
+-    local a = GetActorScript(i)
+-    if (not IsNull(a)) and IsInside(a, zone) then
+-      if IsActorPC(a) then
+-        Deactivate(a)
++    local a = i
++    if (not IsNull(a)) and a:IsInside(zone) then
++      if a.is_hero then
++        a:Deactivate()
+       else
+         DealDamage(a, 10, true)
+       end
+@@ -442,12 +444,12 @@
+ 
+ function tuage(zone)
+   for i = 0,(GetNumberOfActorsInEngine() - 1) do
+-    local a = GetActorScript(i)
+-    if (not IsNull(a)) and IsInside(a, zone) then
+-      if IsActorPC(a) then
+-        Deactivate(a)
++    local a = i
++    if (not IsNull(a)) and a:IsInside(zone) then
++      if a.is_hero then
++        a:Deactivate()
+       else
+-        ConfiscateMoney(a)
++        a:ConfiscateMoney()
+         DealDamage(a, 10, true)
+       end
+     end
+@@ -465,8 +467,8 @@
+ function EscapeWithRiders(riderEscapeLocs, killZones)
+   if #riderEscapeLocs > 0 then
+     for i = 0,(GetNumberOfActorsInEngine() - 1) do
+-      local a = GetActorScript(i)
+-      if IsActorRider(a) then
++      local a = i
++      if a.is_rider then
+         local isIn = false
+         for _, zone in ipairs(killZones) do
+           if IsInside(a, GetLocation(zone)) then
+@@ -475,7 +477,7 @@
+           end
+         end
+         if isIn then
+-          local aPos = GetActorLocation(a)
++          local aPos = a.location
+           local loc = aPos
+           local dist = 1000000
+           for _, v in ipairs(riderEscapeLocs) do
+@@ -499,19 +501,19 @@
+ end
+ 
+ function ActivateAllPCs()
+-  for i = 0,(GetNumberOfPCs() - 1) do
+-    local pc = GetPC(i)
++  for i = 0,(GetNumberOfPcs() - 1) do
++    local pc = GetPc(i)
+     if (not IsNull(pc)) then
+-      Activate(pc)
++      pc:Activate()
+     end
+   end
+ end
+ 
+ function DeactivateAllPCs()
+-  for i = 0,(GetNumberOfPCs() - 1) do
+-    local pc = GetPC(i)
++  for i = 0,(GetNumberOfPcs() - 1) do
++    local pc = GetPc(i)
+     if (not IsNull(pc)) then
+-      Deactivate(pc)
++      pc:Deactivate()
+     end
+   end
+ end--- original/lib/derby.lua
++++ migrated/lib/derby.lua
+@@ -1,5 +1,6 @@
+-require("lib/common")
+-require("lib/typeDefinitions")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ MiscAnimation = {
+   hen1 = 11,
+@@ -16,25 +17,25 @@
+   patch = 0,
+ 
+   Door = {
+-    entranceEast = 22,
+-    mainEntrance = 25,
+-    entranceWest = 29,
+-    OuterCourtyard = 23,
+-    OuterEastRampart = 21,
+-    OuterNorthRampart = 30
++    entranceEast = Doors["Door_22"],
++    mainEntrance = Doors["Door_25"],
++    entranceWest = Doors["Door_29"],
++    OuterCourtyard = Doors["Door_23"],
++    OuterEastRampart = Doors["Door_21"],
++    OuterNorthRampart = Doors["Door_30"]
+   },
+ 
+   Animation = {
+-    candles1 = 0,
+-    candles2 = 1,
+-    chimney = 6,
+-    torch1 = 8,
+-    torch2 = 9,
+-    torch3 = 10,
++    candles1 = Actors["Animation_0"],
++    candles2 = Actors["Animation_1"],
++    chimney = Actors["Animation_6"],
++    torch1 = Actors["Animation_8"],
++    torch2 = Actors["Animation_9"],
++    torch3 = Actors["Animation_10"],
+   },
+ 
+   Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
++    self.patch:Apply()
+     ActivateDoors({self.Door.entranceEast, self.Door.mainEntrance, self.Door.entranceWest})
+     ActivateAnimations(self.Animation)
+   end,
+@@ -50,20 +51,20 @@
+   patch = 1,
+   pixel_vert_patch = 6,
+   Door = {
+-    entrance = 15,
++    entrance = Doors["Door_15"],
+   },
+ 
+   Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    ResetPatch(GetPatchScript(self.pixel_vert_patch))
+-    ActivateDoorMouseSector(true, GetDoorScript(self.door))
+-    SetDoorLockedNPCVillain(GetDoorScript(self.Door.entrance), true)
++    self.patch:Apply()
++    self.pixel_vert_patch:Reset()
++    self.door:SetClickable(true)
++    SetDoorLockedNPCVillain(self.Door.entrance, true)
+   end,
+ 
+   Initialize = function(self)
+-    ApplyPatch(GetPatchScript(self.pixel_vert_patch))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.door))
+-    SetDoorLockedNPCVillain(GetDoorScript(self.Door.entrance), false)
++    self.pixel_vert_patch:Apply()
++    self.door:SetClickable(false)
++    SetDoorLockedNPCVillain(self.Door.entrance, false)
+   end,
+ }
+ 
+@@ -72,27 +73,27 @@
+   patch = 2,
+ 
+   Door = {
+-    entrance = 24,
+-    staircase = 26,
++    entrance = Doors["Door_24"],
++    staircase = Doors["Door_26"],
+   },
+ 
+   Animation = {
+-    candles1 = 2,
+-    candles2 = 3,
+-    candles3 = 4,
+-    candles4 = 5,
+-    chimney = 7
++    candles1 = Actors["Animation_2"],
++    candles2 = Actors["Animation_3"],
++    candles3 = Actors["Animation_4"],
++    candles4 = Actors["Animation_5"],
++    chimney = Actors["Animation_7"]
+   },
+ 
+   Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    ActivateDoorMouseSector(true, GetDoorScript(self.Door.staircase))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.entrance))
++    self.patch:Apply()
++    self.Door.staircase:SetClickable(true)
++    self.Door.entrance:SetClickable(false)
+     ActivateAnimations(self.Animation)
+   end,
+ 
+   Initialize = function(self)
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.staircase))
++    self.Door.staircase:SetClickable(false)
+     DeactivateAnimations(self.Animation)
+   end,
+ }
+@@ -106,36 +107,36 @@
+   doorEast = 8,
+ 
+   Door = {
+-    West = 9,
+-    East = 8
++    West = Doors["Door_9"],
++    East = Doors["Door_8"]
+   },
+ 
+   ---@comment Requires a target called "Treadwheel".
+   Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
++    self.patch:Apply()
+     ActivateDoors(self.Door)
+-    Activate(GetActor("Treadwheel"))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.doorWest))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.doorEast))
++    Actors["Treadwheel"]:Activate()
++    self.doorWest:SetClickable(false)
++    self.doorEast:SetClickable(false)
+   end,
+ 
+   ---@comment Requires a target called "Treadwheel".
+   Initialize = function(self)
+-    Deactivate(GetActor("Treadwheel"))
++    Actors["Treadwheel"]:Deactivate()
+   end,
+ 
+   ---@comment Requires a target called "Treadwheel".
+   ---@param soundLocation pointer? The location to play the sound at. 
+   ActivateDrawBridge = function(self, soundLocation)
+     if soundLocation == nil then
+-      soundLocation = GetActorLocation(GetActor("Treadwheel"))
++      soundLocation = Actors["Treadwheel"].location
+     end
+-    MakeNoise(soundLocation, 1)
++    soundLocation:MakeNoise(1)
+     StartSequence()
+-    SequencePlayAnimFreeze(GetActor("Treadwheel"), AnimationAction.sittingToStanding)
++    SequencePlayAnimFreeze(Actors["Treadwheel"], AnimationAction.sittingToStanding)
+     EndSequence()
+-    ApplyPatch(GetPatchScript(self.lever))
+-    ApplyPatch(GetPatchScript(self.drawBridge))
++    self.lever:Apply()
++    self.drawBridge:Apply()
+   end
+ }
+ 
+@@ -144,11 +145,11 @@
+ 
+   ---@comment Requires a target called "FootBridgeBowTarget" and "Footbridge".
+   Activate = function(self)
+-    Deactivate(GetActor("FootBridgeBowTarget"))
++    Actors["FootBridgeBowTarget"]:Deactivate()
+     StartSequence()
+-    SequencePlayAnimFreeze(GetActor("Footbridge"), AnimationAction.sittingToStanding)
++    SequencePlayAnimFreeze(Actors["Footbridge"], AnimationAction.sittingToStanding)
+     EndSequence()
+-    ApplyPatch(GetPatchScript(self.patch))
++    self.patch:Apply()
+   end
+ }
+ 
+--- original/lib/enums.lua
++++ migrated/lib/enums.lua
+@@ -1,4 +1,5 @@
+-AiState = {
++-- RHMOD MIGRATION: legacy numeric enum values retained separately; native API enums must not be overwritten.
++LegacyAiState = {
+   sleeping = 0,
+   default = 1,
+   wondering = 2,
+@@ -9,7 +10,7 @@
+   script = 7
+ }
+ 
+-ActorAction = {
++LegacyActorAction = {
+   nothing = 0,
+   marching = 1,
+   targetHold = 2,
+@@ -33,7 +34,7 @@
+   --unkown = 20
+ }
+ 
+-ActorEmoticon = {
++LegacyActorEmoticon = {
+   none = 0,
+   wondering = 1,
+   alert = 2,
+@@ -101,7 +102,7 @@
+   robinCapeBowArrowUpShot = 281,
+ }
+ 
+-AiEvent = {
++LegacyAiEvent = {
+   seesPC = 0,
+   hearsSomething = 2,
+   seesBody = 8,
+@@ -110,21 +111,21 @@
+   seesUnsureWhat = 52,
+ }
+ 
+-MovementStyle = {
++LegacyMovementStyle = {
+   walking = 0,
+   running = 1,
+   forceWholeWalk = 2,
+   forceWholeRun = 3,
+ }
+ 
+-ScrollState = {
++LegacyScrollState = {
+   hidden = 0,
+   default = 1,
+   collected = 2,
+   persistent = 3
+ }
+ 
+-PersistentProperty = {
++LegacyPersistentProperty = {
+   arrows = 0,
+   money = 1,
+   hp = 2,
+@@ -149,7 +150,7 @@
+ 
+ KnockOutThreshold = 30
+ 
+-ActorDirection = {
++LegacyActorDirection = {
+   north = 0,
+   northNorthEast = 1,
+   northEast = 2,
+@@ -168,7 +169,7 @@
+   northNorthWest = 15
+ }
+ 
+-ZoomLevel = {
++LegacyZoomLevel = {
+   far = 0,
+   default = 1,
+   close = 2
+@@ -180,7 +181,7 @@
+   alertedPcVisible = 2
+ }
+ 
+-DifficultyLevel = {
++LegacyDifficultyLevel = {
+   easy = 0,
+   medium = 1,
+   hard = 2
+--- original/lib/leicester.lua
++++ migrated/lib/leicester.lua
+@@ -1,5 +1,6 @@
+-require("lib/common")
+-require("lib/typeDefinitions")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ MiscDoor = {
+   secretPassageOutside = 25,
+@@ -41,7 +42,7 @@
+   patch = 7,
+ 
+   Reveal = function (self)
+-    ApplyPatch(GetPatchScript(self.patch))
++    self.patch:Apply()
+   end,
+ 
+   Initialize = function (self) end
+@@ -53,15 +54,15 @@
+     cell = MiscDoor.cell
+   },
+ 
+-  patch = 13,
++  patch = Doors["Door_13"],
+ 
+   Reveal = function (self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    ActivateDoorMouseSector(not IsPatchApplied(GetPatchScript(Cell.patch)), GetDoorScript(self.Door.cell))
++    self.patch:Apply()
++    self.Door.cell:SetClickable(not Cell.patch.applied)
+   end,
+ 
+   Initialize = function (self)
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.cell))
++    self.Door.cell:SetClickable(false)
+   end
+ }
+ 
+@@ -73,65 +74,65 @@
+ 
+   ---@comment Requires a target called "_Mecanisme01_target_1".
+   Reveal = function(self)
+-      ApplyPatch(GetPatchScript(self.patch))
+-      Activate(GetActor("Leicester_-_Mecanisme01_target_1"))
++      self.patch:Apply()
++      Actors["Leicester_-_Mecanisme01_target_1"]:Activate()
+   end,
+ 
+   ---@comment Requires a target called "_Mecanisme01_target_1".
+   Initialize = function(self)
+-      Deactivate(GetActor("Leicester_-_Mecanisme01_target_1"))
++      Actors["Leicester_-_Mecanisme01_target_1"]:Deactivate()
+   end,
+ 
+   ---@comment Requires a target called "_Mecanisme01_target_1".
+   ActivateDrawBridge = function(self)
+       StartSequence()
+-      SequencePlayAnimFreeze(GetActor("Leicester_-_Mecanisme01_target_1"), AnimationAction.sittingToStanding)
++      SequencePlayAnimFreeze(Actors["Leicester_-_Mecanisme01_target_1"], AnimationAction.sittingToStanding)
+       Then()
+       SequenceCall(function()
+-          MakeNoise(GetActorLocation(GetActor("Leicester_-_Mecanisme01_target_1")), 1)
++          Actors["Leicester_-_Mecanisme01_target_1"].location:MakeNoise(1)
+       end)
+       EndSequence()
+-      ApplyPatch(GetPatchScript(self.drawBridge))
+-      ApplyPatch(GetPatchScript(self.lever))
++      self.drawBridge:Apply()
++      self.lever:Apply()
+   end
+ }
+ 
+ ---@type RevealingController
+ BedRoom = {
+   Animation = {
+-      BedroomCandles = 29,
+-  },
+-
+-  patch = 5,
+-
+-  Reveal = function(self)
+-      ApplyPatch(GetPatchScript(self.patch))
+-      Activate(GetActorScript(self.Animation.BedroomCandles))
+-  end,
+-
+-  Initialize = function(self)
+-      Deactivate(GetActorScript(self.Animation.BedroomCandles))
++      BedroomCandles = Actors["Animation_29"],
++  },
++
++  patch = Actors["Animation_5"],
++
++  Reveal = function(self)
++      self.patch:Apply()
++      self.Animation.BedroomCandles:Activate()
++  end,
++
++  Initialize = function(self)
++      self.Animation.BedroomCandles:Deactivate()
+   end
+ }
+ 
+ ---@type RevealingController
+ ChimneyRoom = {
+   Animation = {
+-      chimney = 22,
+-      candles = 30,
+-  },
+-
+-  patch = 6,
+-
+-  Reveal = function(self)
+-      ApplyPatch(GetPatchScript(self.patch))
+-      Activate(GetActorScript(self.Animation.chimney))
+-      Activate(GetActorScript(self.Animation.candles))
+-  end,
+-
+-  Initialize = function(self)
+-      Deactivate(GetActorScript(self.Animation.chimney))
+-      Deactivate(GetActorScript(self.Animation.candles))
++      chimney = Actors["Animation_22"],
++      candles = Actors["Animation_30"],
++  },
++
++  patch = Actors["Animation_6"],
++
++  Reveal = function(self)
++      self.patch:Apply()
++      self.Animation.chimney:Activate()
++      self.Animation.candles:Activate()
++  end,
++
++  Initialize = function(self)
++      self.Animation.chimney:Deactivate()
++      self.Animation.candles:Deactivate()
+   end
+ }
+ 
+@@ -139,56 +140,56 @@
+ Hallway = {
+ 
+   Animation = {
+-      chandelier = 28,
+-  },
+-
+-  patch = 0,
+-
+-  Reveal = function(self)
+-      ApplyPatch(GetPatchScript(self.patch))
+-      ActivateDoorMouseSector(true, GetDoorScript(MiscDoor.hallwaySideDoor))
+-      Activate(GetActorScript(self.Animation.chandelier))
+-  end,
+-
+-  Initialize = function(self)
+-      ActivateDoorMouseSector(false, GetDoorScript(MiscDoor.hallwaySideDoor))
+-      Deactivate(GetActorScript(self.Animation.chandelier))
++      chandelier = Actors["Animation_28"],
++  },
++
++  patch = Actors["Animation_0"],
++
++  Reveal = function(self)
++      self.patch:Apply()
++      MiscDoor.hallwaySideDoor:SetClickable(true)
++      self.Animation.chandelier:Activate()
++  end,
++
++  Initialize = function(self)
++      MiscDoor.hallwaySideDoor:SetClickable(false)
++      self.Animation.chandelier:Deactivate()
+   end
+ }
+ 
+ ---@type RevealingControllerWithBridge
+ DrawBridgeRoomSouth = {
+   Door = {
+-      east = 10,
++      east = Doors["Door_10"],
+       flap = MiscDoor.southBridgeRoomFlap,
+-      west = 12,
+-  },
+-
+-  patch = 4,
+-  drawBridge = 10,
+-  lever = 11,
++      west = Doors["Door_12"],
++  },
++
++  patch = Doors["Door_4"],
++  drawBridge = Doors["Door_10"],
++  lever = Doors["Door_11"],
+ 
+   ---@comment Requires a target called "Leicester_-_Mecanisme03_target_3".
+   Reveal = function(self)
+-      ApplyPatch(GetPatchScript(self.patch))
+-      ActivateDoorMouseSector(true, GetDoorScript(self.Door.flap))
+-      Activate(GetActor("Leicester_-_Mecanisme03_target_3"))
++      self.patch:Apply()
++      self.Door.flap:SetClickable(true)
++      Actors["Leicester_-_Mecanisme03_target_3"]:Activate()
+   end,
+ 
+   ---@comment Requires a target called "Leicester_-_Mecanisme03_target_3".
+   Initialize = function(self)
+-      Deactivate(GetActor("Leicester_-_Mecanisme03_target_3"))
+-      ActivateDoorMouseSector(false, GetDoorScript(self.Door.flap))
++      Actors["Leicester_-_Mecanisme03_target_3"]:Deactivate()
++      self.Door.flap:SetClickable(false)
+   end,
+ 
+   ---@comment Requires a target called "Leicester_-_Mecanisme03_target_3".
+   ActivateDrawBridge = function(self)
+-      MakeNoise(GetActorLocation(GetActor("Leicester_-_Mecanisme03_target_3")), 1)
++      Actors["Leicester_-_Mecanisme03_target_3"].location:MakeNoise(1)
+       StartSequence()
+-      SequencePlayAnimFreeze(GetActor("Leicester_-_Mecanisme03_target_3"), AnimationAction.sittingToStanding)
++      SequencePlayAnimFreeze(Actors["Leicester_-_Mecanisme03_target_3"], AnimationAction.sittingToStanding)
+       EndSequence()
+-      ApplyPatch(GetPatchScript(self.lever))
+-      ApplyPatch(GetPatchScript(self.drawBridge))
++      self.lever:Apply()
++      self.drawBridge:Apply()
+   end
+ 
+ }
+@@ -198,8 +199,8 @@
+   patch = 14,
+ 
+   Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    ActivateDoorMouseSector(not IsPatchApplied(GetPatchScript(CellTower.patch)), GetDoorScript(MiscDoor.cell))
++    self.patch:Apply()
++    MiscDoor.cell:SetClickable(not CellTower.patch.applied)
+   end,
+ 
+   Initialize = function (self) end
+--- original/lib/lincoln.lua
++++ migrated/lib/lincoln.lua
+@@ -1,5 +1,6 @@
+-require("lib/common")
+-require("lib/typeDefinitions")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ MiscDoor = {
+   garissonEntrance = 28,
+@@ -41,31 +42,31 @@
+ ---@type RevealingControllerWithDoor
+ Dungeon = {
+   Door = {
+-    cell = 8,
+-    exit = 21
+-  },
+-
+-  Animation = {
+-    torch1 = 21,
+-    torch2 = 22,
+-  },
+-
+-  patch = 0,
+-
+-  Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    Activate(GetActorScript(self.Animation.torch1))
+-    Activate(GetActorScript(self.Animation.torch2))
+-    ActivateDoorMouseSector(true, GetDoorScript(self.Door.exit))
+-    ActivateDoorMouseSector(true, GetDoorScript(self.Door.cell))
+-  end,
+-
+-  Initialize = function(self)
+-    Deactivate(GetActorScript(self.Animation.torch1))
+-    Deactivate(GetActorScript(self.Animation.torch2))
+-
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.exit))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.cell))
++    cell = Doors["Door_8"],
++    exit = Doors["Door_21"]
++  },
++
++  Animation = {
++    torch1 = Actors["Animation_21"],
++    torch2 = Actors["Animation_22"],
++  },
++
++  patch = Actors["Animation_0"],
++
++  Reveal = function(self)
++    self.patch:Apply()
++    self.Animation.torch1:Activate()
++    self.Animation.torch2:Activate()
++    self.Door.exit:SetClickable(true)
++    self.Door.cell:SetClickable(true)
++  end,
++
++  Initialize = function(self)
++    self.Animation.torch1:Deactivate()
++    self.Animation.torch2:Deactivate()
++
++    self.Door.exit:SetClickable(false)
++    self.Door.cell:SetClickable(false)
+   end
+ }
+ 
+@@ -76,41 +77,41 @@
+   },
+ 
+   Animation = {
+-    candles = 32,
+-  },
+-
+-  patch = 1,
+-
+-  Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    Activate(GetActorScript(self.Animation.candles))
+-    ActivateDoorMouseSector(true, GetDoorScript(self.Door.dungeonEntrance))
+-  end,
+-
+-  Initialize = function(self)
+-    Deactivate(GetActorScript(self.Animation.candles))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.dungeonEntrance))
++    candles = Actors["Animation_32"],
++  },
++
++  patch = Actors["Animation_1"],
++
++  Reveal = function(self)
++    self.patch:Apply()
++    self.Animation.candles:Activate()
++    self.Door.dungeonEntrance:SetClickable(true)
++  end,
++
++  Initialize = function(self)
++    self.Animation.candles:Deactivate()
++    self.Door.dungeonEntrance:SetClickable(false)
+   end
+ }
+ 
+ ---@type RevealingControllerWithDoor
+ BedRoom = {
+   Door = {
+-    balcony = 22,
+-    innerToTop = 23,
+-    outerToTop = 24,
+-  },
+-
+-  patch = 7,
+-
+-  Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    ActivateDoorMouseSector(true, GetDoorScript(self.Door.innerToTop))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.balcony))
+-  end,
+-
+-  Initialize = function(self)
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.innerToTop))
++    balcony = Doors["Door_22"],
++    innerToTop = Doors["Door_23"],
++    outerToTop = Doors["Door_24"],
++  },
++
++  patch = Doors["Door_7"],
++
++  Reveal = function(self)
++    self.patch:Apply()
++    self.Door.innerToTop:SetClickable(true)
++    self.Door.balcony:SetClickable(false)
++  end,
++
++  Initialize = function(self)
++    self.Door.innerToTop:SetClickable(false)
+   end
+ }
+ 
+@@ -122,142 +123,142 @@
+ 
+   ---@comment Requires a target called "Treadwheel".
+   Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    Activate(GetActor("Treadwheel"))
++    self.patch:Apply()
++    Actors["Treadwheel"]:Activate()
+   end,
+ 
+   ---@comment Requires a target called "Treadwheel".
+   Initialize = function(self)
+-    Deactivate(GetActor("Treadwheel"))
++    Actors["Treadwheel"]:Deactivate()
+   end,
+ 
+   ---@comment Requires a target called "Treadwheel".
+   ActivateDrawBridge = function(self, soundLocation)
+     StartSequence()
+-    SequencePlayAnimFreeze(GetActor("Treadwheel"), AnimationAction.sittingToStanding)
++    SequencePlayAnimFreeze(Actors["Treadwheel"], AnimationAction.sittingToStanding)
+     Then()
+     SequenceCall(function()
+-      MakeNoise(soundLocation, 1)
++      soundLocation:MakeNoise(1)
+     end)
+     EndSequence()
+-    ApplyPatch(GetPatchScript(self.drawBridge))
+-    ApplyPatch(GetPatchScript(self.lever))
++    self.drawBridge:Apply()
++    self.lever:Apply()
+   end
+ }
+ 
+ ---@type RevealingControllerWithDoor
+ Battlement = {
+   Door = {
+-    exit = 6,
+-    innerDoor = 37,
+-    gardenDoor = 38
+-  },
+-
+-  Animation = {
+-    torch = 23
+-  },
+-
+-  patch = 6,
+-
+-  Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    Activate(GetActorScript(self.Animation.torch))
+-    ActivateDoorMouseSector(true, GetDoorScript(self.Door.innerDoor))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.exit))
+-  end,
+-
+-  Initialize = function(self)
+-    Deactivate(GetActorScript(self.Animation.torch))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.innerDoor))
++    exit = Doors["Door_6"],
++    innerDoor = Doors["Door_37"],
++    gardenDoor = Doors["Door_38"]
++  },
++
++  Animation = {
++    torch = Actors["Animation_23"]
++  },
++
++  patch = Actors["Animation_6"],
++
++  Reveal = function(self)
++    self.patch:Apply()
++    self.Animation.torch:Activate()
++    self.Door.innerDoor:SetClickable(true)
++    self.Door.exit:SetClickable(false)
++  end,
++
++  Initialize = function(self)
++    self.Animation.torch:Deactivate()
++    self.Door.innerDoor:SetClickable(false)
+   end
+ }
+ 
+ ---@type RevealingControllerWithDoor
+ WeaponRoom = {
+   Door = {
+-    southEntrance = 4,
+-    westEntrance = 5,
++    southEntrance = Doors["Door_4"],
++    westEntrance = Doors["Door_5"],
+     innerDoor = MiscDoor.WeaponRoomInnerHouse.fromWeaponRoom
+   },
+ 
+-  patch = 8,
+-
+-  Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    ActivateDoorMouseSector(true, GetDoorScript(self.Door.innerDoor))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.southEntrance))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.westEntrance))
+-  end,
+-
+-  Initialize = function(self)
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.innerDoor))
++  patch = Doors["Door_8"],
++
++  Reveal = function(self)
++    self.patch:Apply()
++    self.Door.innerDoor:SetClickable(true)
++    self.Door.southEntrance:SetClickable(false)
++    self.Door.westEntrance:SetClickable(false)
++  end,
++
++  Initialize = function(self)
++    self.Door.innerDoor:SetClickable(false)
+   end
+ }
+ 
+ ---@type RevealingController
+ StairCase = {
+   Animation = {
+-    torch1 = 24,
+-    torch2 = 25,
+-  },
+-
+-  patch = 10,
+-
+-  Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    Activate(GetActorScript(self.Animation.torch1))
+-    Activate(GetActorScript(self.Animation.torch2))
+-  end,
+-
+-  Initialize = function(self)
+-    Deactivate(GetActorScript(self.Animation.torch1))
+-    Deactivate(GetActorScript(self.Animation.torch2))
++    torch1 = Actors["Animation_24"],
++    torch2 = Actors["Animation_25"],
++  },
++
++  patch = Actors["Animation_10"],
++
++  Reveal = function(self)
++    self.patch:Apply()
++    self.Animation.torch1:Activate()
++    self.Animation.torch2:Activate()
++  end,
++
++  Initialize = function(self)
++    self.Animation.torch1:Deactivate()
++    self.Animation.torch2:Deactivate()
+   end
+ }
+ 
+ ---@type RevealingControllerWithDoor
+ ThroneRoom = {
+   Door = {
+-    exit = 0,
+-  },
+-
+-  Animation = {
+-    chimneyFire1 = 19,
+-    chimneyFire2 = 20,
+-    candles1 = 26,
+-    candles2 = 27,
+-    bedroomCandles = 28,
+-    tableCandles1 = 29,
+-    tableCandles2 = 30,
+-    tableCandles3 = 31,
+-  },
+-
+-  patch = 11,
+-
+-  Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-
+-    Activate(GetActorScript(self.Animation.chimneyFire1))
+-    Activate(GetActorScript(self.Animation.chimneyFire2))
+-    Activate(GetActorScript(self.Animation.candles1))
+-    Activate(GetActorScript(self.Animation.candles2))
+-    Activate(GetActorScript(self.Animation.bedroomCandles))
+-    Activate(GetActorScript(self.Animation.tableCandles1))
+-    Activate(GetActorScript(self.Animation.tableCandles2))
+-    Activate(GetActorScript(self.Animation.tableCandles3))
+-
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.exit))
+-  end,
+-
+-  Initialize = function(self)
+-    Deactivate(GetActorScript(self.Animation.chimneyFire1))
+-    Deactivate(GetActorScript(self.Animation.chimneyFire2))
+-    Deactivate(GetActorScript(self.Animation.candles1))
+-    Deactivate(GetActorScript(self.Animation.candles2))
+-    Deactivate(GetActorScript(self.Animation.bedroomCandles))
+-    Deactivate(GetActorScript(self.Animation.tableCandles1))
+-    Deactivate(GetActorScript(self.Animation.tableCandles2))
+-    Deactivate(GetActorScript(self.Animation.tableCandles3))
++    exit = Doors["Door_0"],
++  },
++
++  Animation = {
++    chimneyFire1 = Actors["Animation_19"],
++    chimneyFire2 = Actors["Animation_20"],
++    candles1 = Actors["Animation_26"],
++    candles2 = Actors["Animation_27"],
++    bedroomCandles = Actors["Animation_28"],
++    tableCandles1 = Actors["Animation_29"],
++    tableCandles2 = Actors["Animation_30"],
++    tableCandles3 = Actors["Animation_31"],
++  },
++
++  patch = Actors["Animation_11"],
++
++  Reveal = function(self)
++    self.patch:Apply()
++
++    self.Animation.chimneyFire1:Activate()
++    self.Animation.chimneyFire2:Activate()
++    self.Animation.candles1:Activate()
++    self.Animation.candles2:Activate()
++    self.Animation.bedroomCandles:Activate()
++    self.Animation.tableCandles1:Activate()
++    self.Animation.tableCandles2:Activate()
++    self.Animation.tableCandles3:Activate()
++
++    self.Door.exit:SetClickable(false)
++  end,
++
++  Initialize = function(self)
++    self.Animation.chimneyFire1:Deactivate()
++    self.Animation.chimneyFire2:Deactivate()
++    self.Animation.candles1:Deactivate()
++    self.Animation.candles2:Deactivate()
++    self.Animation.bedroomCandles:Deactivate()
++    self.Animation.tableCandles1:Deactivate()
++    self.Animation.tableCandles2:Deactivate()
++    self.Animation.tableCandles3:Deactivate()
+   end
+ }
+ 
+--- original/lib/nottingham.lua
++++ migrated/lib/nottingham.lua
+@@ -1,5 +1,6 @@
+-require("lib/common")
+-require("lib/typeDefinitions")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ MiscDoor = {
+     sheriffCousinHouse = 4,
+@@ -56,177 +57,177 @@
+ ---@type RevealingControllerWithDoor
+ Church = {
+     Door = {
+-        sideEntrance = 54,
+-        mainEntrance = 55,
+-        confessionalBox1 = 56,
+-        confessionalBox2 = 57,
+-    },
+-
+-    Animation = {
+-        candles = 28,
+-    },
+-
+-    patch = 0,
+-
+-    Reveal = function (self)
+-        ApplyPatch(GetPatchScript(self.patch))
+-
+-        ActivateDoorMouseSector(true, GetDoorScript(self.Door.confessionalBox1))
+-        ActivateDoorMouseSector(true, GetDoorScript(self.Door.confessionalBox2))
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.sideEntrance))
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.mainEntrance))
+-
+-        Activate(GetActorScript(self.Animation.candles))
+-    end,
+-
+-    Initialize = function (self)
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.confessionalBox1))
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.confessionalBox2))
+-
+-        Deactivate(GetActorScript(self.Animation.candles))
++        sideEntrance = Doors["Door_54"],
++        mainEntrance = Doors["Door_55"],
++        confessionalBox1 = Doors["Door_56"],
++        confessionalBox2 = Doors["Door_57"],
++    },
++
++    Animation = {
++        candles = Actors["Animation_28"],
++    },
++
++    patch = Actors["Animation_0"],
++
++    Reveal = function (self)
++        self.patch:Apply()
++
++        self.Door.confessionalBox1:SetClickable(true)
++        self.Door.confessionalBox2:SetClickable(true)
++        self.Door.sideEntrance:SetClickable(false)
++        self.Door.mainEntrance:SetClickable(false)
++
++        self.Animation.candles:Activate()
++    end,
++
++    Initialize = function (self)
++        self.Door.confessionalBox1:SetClickable(false)
++        self.Door.confessionalBox2:SetClickable(false)
++
++        self.Animation.candles:Deactivate()
+     end
+ }
+ 
+ ---@type RevealingControllerWithDoor
+ PrisonNorth = {
+     Door = {
+-        cell = 58,
+-        southEntrance = 59,
+-        exit = 74,
+-        exitTop = 75,
+-        exitOuter = 76,
+-    },
+-
+-    patch = 2,
+-
+-    Reveal = function (self)
+-        ApplyPatch(GetPatchScript(self.patch))
+-
+-        ActivateDoorMouseSector(true, GetDoorScript(self.Door.cell))
+-        ActivateDoorMouseSector(true, GetDoorScript(self.Door.exit))
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.southEntrance))
+-    end,
+-
+-    Initialize = function (self)
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.cell))
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.exit))
++        cell = Doors["Door_58"],
++        southEntrance = Doors["Door_59"],
++        exit = Doors["Door_74"],
++        exitTop = Doors["Door_75"],
++        exitOuter = Doors["Door_76"],
++    },
++
++    patch = Doors["Door_2"],
++
++    Reveal = function (self)
++        self.patch:Apply()
++
++        self.Door.cell:SetClickable(true)
++        self.Door.exit:SetClickable(true)
++        self.Door.southEntrance:SetClickable(false)
++    end,
++
++    Initialize = function (self)
++        self.Door.cell:SetClickable(false)
++        self.Door.exit:SetClickable(false)
+     end
+ }
+ 
+ ---@type RevealingControllerWithFallGate
+ FallGateRoom = {
+     Animation = {
+-        torch = 35,
+-    },
+-
+-    patch = 5,
++        torch = Actors["Animation_35"],
++    },
++
++    patch = Actors["Animation_5"],
+     fallGate = MiscPatch.fallGate,
+-    lever = 4,
+-
+-    Reveal = function (self)
+-        ApplyPatch(GetPatchScript(self.patch))
+-        Activate(GetActor("Treadwheel"))
++    lever = Actors["Animation_4"],
++
++    Reveal = function (self)
++        self.patch:Apply()
++        Actors["Treadwheel"]:Activate()
+         Activate(GetActor(self.Animation.torch))
+     end,
+ 
+     Initialize = function (self)
+-        Deactivate(GetActor("Treadwheel"))
++        Actors["Treadwheel"]:Deactivate()
+         Deactivate(GetActor(self.Animation.torch))
+     end,
+ 
+     ActivateFallGate = function(self, location)
+         StartSequence()
+-        SequencePlayAnimFreeze(GetActor("Treadwheel"), AnimationAction.sittingToStanding)
++        SequencePlayAnimFreeze(Actors["Treadwheel"], AnimationAction.sittingToStanding)
+         Then()
+         SequenceCall(function()
+-          MakeNoise(location, 1)
++          location:MakeNoise(1)
+         end)
+         EndSequence()
+-        ApplyPatch(GetPatchScript(self.fallGate))
+-        ApplyPatch(GetPatchScript(self.lever))
++        self.fallGate:Apply()
++        self.lever:Apply()
+       end
+ }
+ 
+ ---@type RevealingControllerWithDoor
+ PrisonSouth = {
+     Door = {
+-        sideEntrance = 81,
+-        mainEntrance = 82,
+-        cell = 83,
+-        stairs = 84,
+-    },
+-
+-    Animation = {
+-        torch1 = 33,
+-        torch2 = 34,
+-    },
+-
+-    patch = 7,
+-
+-    Reveal = function (self)
+-        ApplyPatch(GetPatchScript(self.patch))
+-
+-        Activate(GetActorScript(self.Animation.torch1))
+-        Activate(GetActorScript(self.Animation.torch2))
+-
+-        ActivateDoorMouseSector(true, GetDoorScript(self.Door.cell))
+-        ActivateDoorMouseSector(true, GetDoorScript(self.Door.stairs))
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.sideEntrance))
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.mainEntrance))
+-    end,
+-
+-    Initialize = function (self)
+-        Deactivate(GetActorScript(self.Animation.torch1))
+-        Deactivate(GetActorScript(self.Animation.torch2))
+-
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.cell))
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.stairs))
++        sideEntrance = Doors["Door_81"],
++        mainEntrance = Doors["Door_82"],
++        cell = Doors["Door_83"],
++        stairs = Doors["Door_84"],
++    },
++
++    Animation = {
++        torch1 = Actors["Animation_33"],
++        torch2 = Actors["Animation_34"],
++    },
++
++    patch = Actors["Animation_7"],
++
++    Reveal = function (self)
++        self.patch:Apply()
++
++        self.Animation.torch1:Activate()
++        self.Animation.torch2:Activate()
++
++        self.Door.cell:SetClickable(true)
++        self.Door.stairs:SetClickable(true)
++        self.Door.sideEntrance:SetClickable(false)
++        self.Door.mainEntrance:SetClickable(false)
++    end,
++
++    Initialize = function (self)
++        self.Animation.torch1:Deactivate()
++        self.Animation.torch2:Deactivate()
++
++        self.Door.cell:SetClickable(false)
++        self.Door.stairs:SetClickable(false)
+     end
+ }
+ 
+ ---@type RevealingControllerWithDoor
+ Chateau = {
+     Door = {
+-        side = 86,
+-        main = 87,
+-        cupboard = 92,
+-        mainOuter = 88,
+-        northTower = 89
+-    },
+-
+-    Animation = {
+-        chimney = 27,
+-        chandelier = 29,
+-        candles1 = 30,
+-        candles2 = 31,
+-        candles3 = 32,
+-    },
+-
+-    patch = 8,
+-
+-    Reveal = function (self)
+-        ApplyPatch(GetPatchScript(self.patch))
+-
+-        Activate(GetActorScript(self.Animation.chimney))
+-        Activate(GetActorScript(self.Animation.chandelier))
+-        Activate(GetActorScript(self.Animation.candles1))
+-        Activate(GetActorScript(self.Animation.candles2))
+-        Activate(GetActorScript(self.Animation.candles3))
+-
+-        ActivateDoorMouseSector(true, GetDoorScript(self.Door.main))
+-        ActivateDoorMouseSector(true, GetDoorScript(self.Door.cupboard))
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.side))
+-    end,
+-
+-    Initialize = function (self)
+-        Deactivate(GetActorScript(self.Animation.chimney))
+-        Deactivate(GetActorScript(self.Animation.chandelier))
+-        Deactivate(GetActorScript(self.Animation.candles1))
+-        Deactivate(GetActorScript(self.Animation.candles2))
+-        Deactivate(GetActorScript(self.Animation.candles3))
+-
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.main))
+-        ActivateDoorMouseSector(false, GetDoorScript(self.Door.cupboard))
++        side = Doors["Door_86"],
++        main = Doors["Door_87"],
++        cupboard = Doors["Door_92"],
++        mainOuter = Doors["Door_88"],
++        northTower = Doors["Door_89"]
++    },
++
++    Animation = {
++        chimney = Actors["Animation_27"],
++        chandelier = Actors["Animation_29"],
++        candles1 = Actors["Animation_30"],
++        candles2 = Actors["Animation_31"],
++        candles3 = Actors["Animation_32"],
++    },
++
++    patch = Actors["Animation_8"],
++
++    Reveal = function (self)
++        self.patch:Apply()
++
++        self.Animation.chimney:Activate()
++        self.Animation.chandelier:Activate()
++        self.Animation.candles1:Activate()
++        self.Animation.candles2:Activate()
++        self.Animation.candles3:Activate()
++
++        self.Door.main:SetClickable(true)
++        self.Door.cupboard:SetClickable(true)
++        self.Door.side:SetClickable(false)
++    end,
++
++    Initialize = function (self)
++        self.Animation.chimney:Deactivate()
++        self.Animation.chandelier:Deactivate()
++        self.Animation.candles1:Deactivate()
++        self.Animation.candles2:Deactivate()
++        self.Animation.candles3:Deactivate()
++
++        self.Door.main:SetClickable(false)
++        self.Door.cupboard:SetClickable(false)
+     end
+ }
+ 
+--- original/lib/seemless/H01.lua
++++ migrated/lib/seemless/H01.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/lincolnSeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+@@ -122,7 +124,7 @@
+ 
+ BridgeTreadwheel = {
+   ActivatedBySword = function(actorSource)
+-    DrawBridgeRoom:ActivateDrawBridge(GetLocation("BridgeNoiseLoc_37"))
++    DrawBridgeRoom:ActivateDrawBridge(Locations["BridgeNoiseLoc_37"])
+   end
+ }
+ 
+--- original/lib/seemless/H02.lua
++++ migrated/lib/seemless/H02.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/nottinghamSeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+--- original/lib/seemless/H03.lua
++++ migrated/lib/seemless/H03.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/derbySeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+--- original/lib/seemless/H04.lua
++++ migrated/lib/seemless/H04.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/leicesterSeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+--- original/lib/seemless/H05.lua
++++ migrated/lib/seemless/H05.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/lincolnSeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+@@ -131,8 +133,8 @@
+ --Targets
+ mecanisme_pont_levis_800001c7 = {
+   ActivatedBySword = function (actorSource)
+-    if not IsPatchApplied(GetPatchScript(DrawBridgeRoom.drawBridge)) then
+-      DrawBridgeRoom:ActivateDrawBridge(GetLocation("Node_13"))
++    if not DrawBridgeRoom.drawBridge.applied then
++      DrawBridgeRoom:ActivateDrawBridge(Locations["Node_13"])
+     end
+   end
+ }--- original/lib/seemless/H07.lua
++++ migrated/lib/seemless/H07.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/nottinghamSeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+--- original/lib/seemless/H09.lua
++++ migrated/lib/seemless/H09.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/nottinghamSeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+--- original/lib/seemless/H10.lua
++++ migrated/lib/seemless/H10.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/yorkSeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+--- original/lib/seemless/H12.lua
++++ migrated/lib/seemless/H12.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/nottinghamSeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+--- original/lib/seemless/S01.lua
++++ migrated/lib/seemless/S01.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/nottinghamSeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+--- original/lib/seemless/S02.lua
++++ migrated/lib/seemless/S02.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/leicesterSeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+--- original/lib/seemless/S04.lua
++++ migrated/lib/seemless/S04.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/derbySeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+--- original/lib/seemless/S05.lua
++++ migrated/lib/seemless/S05.lua
+@@ -1,4 +1,6 @@
+-require("lib/seemless/yorkSeemless")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@type {[string]: InterriorExterriorData}
+ local spaces_data = {
+--- original/lib/seemless/derbySeemless.lua
++++ migrated/lib/seemless/derbySeemless.lua
+@@ -1,5 +1,6 @@
+-require("lib/seemless/seemlessCommon")
+-require("lib/derby")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@return {[string]: HiddenSpace}
+ ---@param data {[string]: InterriorExterriorData} The data from which to create the hidden spaces.
+@@ -30,22 +31,22 @@
+ 
+ DoorSets = {
+   MainHall = {
+-    Main = {23, 22},
+-    East = {22, 21},
+-    North = {29, 30}
++    Main = {Doors["Door_23"], Doors["Door_22"]},
++    East = {Doors["Door_22"], Doors["Door_21"]},
++    North = {Doors["Door_29"], Doors["Door_30"]}
+   },
+   DiningHall = {
+-    Main = {24},
+-    Top = {27},
++    Main = {Doors["Door_24"]},
++    Top = {Doors["Door_27"]},
+     Balcony = {}
+   },
+   Prison = {
+-    Top = {14, 15},
+-    Bottom = {13, 15}
++    Top = {Doors["Door_14"], Doors["Door_15"]},
++    Bottom = {Doors["Door_13"], Doors["Door_15"]}
+   },
+   BridgeRoom = {
+-    East = {8},
+-    West = {9},
++    East = {Doors["Door_8"]},
++    West = {Doors["Door_9"]},
+     Top = {}
+   }
+ }
+@@ -93,14 +94,14 @@
+ --Zones
+ DiningHallRevealMain = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealDiningHallDoored(DoorSets.DiningHall.Main)
+     end
+   end
+ }
+ DiningHallRevealTop = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealDiningHallDoored(DoorSets.DiningHall.Top)
+     end
+   end
+@@ -109,28 +110,28 @@
+ 
+ MainHallRevealMain = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealMainHallDoored(DoorSets.MainHall.Main)
+     end
+   end
+ }
+ MainHallRevealEast = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealMainHallDoored(DoorSets.MainHall.East)
+     end
+   end
+ }
+ MainHallRevealNorthImmediate = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealMainHallDoored(DoorSets.MainHall.North)
+     end
+   end
+ }
+ MainHallRevealNorthFar = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealMainHallDoored(DoorSets.MainHall.North)
+     end
+   end
+@@ -139,14 +140,14 @@
+ 
+ PrisonRevealTop = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealPrisonDoored(DoorSets.Prison.Top)
+     end
+   end
+ }
+ PrisonRevealBottom = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealPrisonDoored(DoorSets.Prison.Bottom)
+     end
+   end
+@@ -155,21 +156,21 @@
+ 
+ BridgeRevealEast = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealBridgeRoomDoored(DoorSets.BridgeRoom.East)
+     end
+   end
+ }
+ BridgeRevealWest = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealBridgeRoomDoored(DoorSets.BridgeRoom.West)
+     end
+   end
+ }
+ BridgeRevealTop = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealBridgeRoomDoored(DoorSets.BridgeRoom.Top)
+     end
+   end
+--- original/lib/seemless/leicesterSeemless.lua
++++ migrated/lib/seemless/leicesterSeemless.lua
+@@ -1,5 +1,6 @@
+-require("lib/leicester")
+-require("lib/seemless/seemlessCommon")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@return {[string]: HiddenSpace}
+ ---@param data {[string]: InterriorExterriorData} The data from which to create the hidden spaces.
+@@ -52,9 +53,9 @@
+ 
+ DoorSets = {
+   SouthBridgeRoom = {
+-    East = {10, 11},
+-    West = {11, 12},
+-    Any = {10, 11, 12}
++    East = {Doors["Door_10"], Doors["Door_11"]},
++    West = {Doors["Door_11"], Doors["Door_12"]},
++    Any = {Doors["Door_10"], Doors["Door_11"], Doors["Door_12"]}
+   },
+   EastTower = {
+     Stairs = {},
+@@ -62,10 +63,10 @@
+   },
+   CellTower = {
+     Outer = {},
+-    Cell = {55}
++    Cell = {Doors["Door_55"]}
+   },
+   Prison = {
+-    TheOnlyOne = {55}
++    TheOnlyOne = {Doors["Door_55"]}
+   },
+   NorthTower = {
+     TheOnlyOne = {}
+@@ -159,21 +160,21 @@
+ --Zones
+ SouthBridgeRevealEast = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealDrawBridgeRoomSouthDoored(DoorSets.SouthBridgeRoom.East)
+     end
+   end
+ }
+ SouthBridgeRevealWest = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealDrawBridgeRoomSouthDoored(DoorSets.SouthBridgeRoom.West)
+     end
+   end
+ }
+ SouthBridgeRevealAny = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealDrawBridgeRoomSouthDoored(DoorSets.SouthBridgeRoom.Any)
+     end
+   end
+@@ -182,28 +183,28 @@
+ 
+ EastTowerRevealStairsTop = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealTowersEastDoored(DoorSets.EastTower.Stairs)
+     end
+   end
+ }
+ EastTowerRevealStairs = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealTowersEastDoored(DoorSets.EastTower.Stairs)
+     end
+   end
+ }
+ EastTowerRevealInnerBridge = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealTowersEastDoored(DoorSets.EastTower.EastBottom)
+     end
+   end
+ }
+ EastTowerRevealOuterBridge = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealTowersEastDoored(DoorSets.EastTower.EastBottom)
+     end
+   end
+@@ -212,14 +213,14 @@
+ 
+ HallwayRevealCourtyard = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealHallwayDoored(DoorSets.Hallway.Courtyard)
+     end
+   end
+ }
+ HallwayRevealWest = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealHallwayDoored(DoorSets.Hallway.Bridge)
+     end
+   end
+@@ -228,14 +229,14 @@
+ 
+ CellTowerRevealOuter = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealCellTowerDoored(DoorSets.CellTower.Outer)
+     end
+   end
+ }
+ CellTowerRevealCell = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealCellTowerDoored(DoorSets.CellTower.Cell)
+     end
+   end
+@@ -244,7 +245,7 @@
+ 
+ PrisonReveal = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealPrisonDoored(DoorSets.Prison.TheOnlyOne)
+     end
+   end
+@@ -253,7 +254,7 @@
+ 
+ BedroomReveal = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealBedroomDoored(DoorSets.Bedroom.TheOnlyOne)
+     end
+   end
+@@ -262,7 +263,7 @@
+ 
+ NorthTowerReveal = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealTowerNorthDoored(DoorSets.NorthTower.TheOnlyOne)
+     end
+   end
+@@ -271,14 +272,14 @@
+ 
+ ChimneyRoomRevealWest = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealChimneyRoomDoored(DoorSets.ChimneyRoom.West)
+     end
+   end
+ }
+ ChimneyRoomRevealEast = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealChimneyRoomDoored(DoorSets.ChimneyRoom.East)
+     end
+   end
+--- original/lib/seemless/lincolnSeemless.lua
++++ migrated/lib/seemless/lincolnSeemless.lua
+@@ -1,5 +1,6 @@
+-require("lib/lincoln")
+-require("lib/seemless/seemlessCommon")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@return {[string]: HiddenSpace}
+ ---@param data {[string]: InterriorExterriorData} The data from which to create the hidden spaces.
+@@ -50,10 +51,10 @@
+ 
+ DoorSets = {
+   WeaponRoom = {
+-    SouthWest = {5},
+-    SouthEast = {4},
+-    NorthEast = {25, 27},
+-    Tower = {25, 26}
++    SouthWest = {Doors["Door_5"]},
++    SouthEast = {Doors["Door_4"]},
++    NorthEast = {Doors["Door_25"], Doors["Door_27"]},
++    Tower = {Doors["Door_25"], Doors["Door_26"]}
+   },
+   Staircase = {
+     Top = {},
+@@ -61,27 +62,27 @@
+   },
+   DungeonTower = {
+     Rampart = {},
+-    Prison = {21, 20}
++    Prison = {Doors["Door_21"], Doors["Door_20"]}
+   },
+   Prison = {
+-    TheOnlyOne = {20, 21}
++    TheOnlyOne = {Doors["Door_20"], Doors["Door_21"]}
+   },
+   Bedroom = {
+-    Ivy = {22},
+-    Rampart = {23, 24}
++    Ivy = {Doors["Door_22"]},
++    Rampart = {Doors["Door_23"], Doors["Door_24"]}
+   },
+   ThroneRoom = {
+-    SouthEast = {0},
++    SouthEast = {Doors["Door_0"]},
+     NorthWest = {}
+   },
+   BridgeRoom = {
+     Rampart = {},
+-    Tower = {52, 53}
++    Tower = {Doors["Door_52"], Doors["Door_53"]}
+   },
+   Battlement = {
+-    Top = {37, 36},
+-    SouthWest = {6},
+-    Garden = {36, 38}
++    Top = {Doors["Door_37"], Doors["Door_36"]},
++    SouthWest = {Doors["Door_6"]},
++    Garden = {Doors["Door_36"], Doors["Door_38"]}
+   }
+ }
+ 
+@@ -160,14 +161,14 @@
+ --Zones
+ BridgeRoomRevealRampart = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealBridgeRoom(DoorSets.BridgeRoom.Rampart)
+     end
+   end
+ }
+ BridgeRoomRevealTower = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealBridgeRoom(DoorSets.BridgeRoom.Tower)
+     end
+   end
+@@ -176,7 +177,7 @@
+ 
+ PrisonReveal = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealPrison(DoorSets.Prison.TheOnlyOne)
+     end
+   end
+@@ -185,14 +186,14 @@
+ 
+ DungeonTowerRevealRampart = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealDungeonTower(DoorSets.DungeonTower.Rampart)
+     end
+   end
+ }
+ DungeonTowerRevealPrison = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealDungeonTower(DoorSets.DungeonTower.Prison)
+     end
+   end
+@@ -201,21 +202,21 @@
+ 
+ BattlementRevealTop = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealBattlement(DoorSets.Battlement.Top)
+     end
+   end
+ }
+ BattlementRevealSouthWest = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealBattlement(DoorSets.Battlement.SouthWest)
+     end
+   end
+ }
+ BattlementRevealGarden = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealBattlement(DoorSets.Battlement.Garden)
+     end
+   end
+@@ -224,14 +225,14 @@
+ 
+ ThroneRoomRevealNorthWest = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealThroneRoom(DoorSets.ThroneRoom.NorthWest)
+     end
+   end
+ }
+ ThroneRoomRevealSouthEast = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealThroneRoom(DoorSets.ThroneRoom.SouthEast)
+     end
+   end
+@@ -240,28 +241,28 @@
+ 
+ WeaponRoomRevealSouthEast = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealWeaponRoom(DoorSets.WeaponRoom.SouthEast)
+     end
+   end
+ }
+ WeaponRoomRevealSouthWest = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealWeaponRoom(DoorSets.WeaponRoom.SouthWest)
+     end
+   end
+ }
+ WeaponRoomRevealNorthEast = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealWeaponRoom(DoorSets.WeaponRoom.NorthEast)
+     end
+   end
+ }
+ WeaponRoomRevealTower = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealWeaponRoom(DoorSets.WeaponRoom.Tower)
+     end
+   end
+@@ -270,14 +271,14 @@
+ 
+ BedroomRevealIvy = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealBedRoom(DoorSets.Bedroom.Ivy)
+     end
+   end
+ }
+ BedroomRevealRampart = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealBedRoom(DoorSets.Bedroom.Rampart)
+     end
+   end
+@@ -286,14 +287,14 @@
+ 
+ StaircaseRevealTop = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealStaircase(DoorSets.Staircase.Top)
+     end
+   end
+ }
+ StaircaseRevealBottom = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       DooredRevealStaircase(DoorSets.Staircase.Bottom)
+     end
+   end
+--- original/lib/seemless/nottinghamSeemless.lua
++++ migrated/lib/seemless/nottinghamSeemless.lua
+@@ -1,5 +1,6 @@
+-require("lib/nottingham")
+-require("lib/seemless/seemlessCommon")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@return {[string]: HiddenSpace}
+ ---@param data {[string]: InterriorExterriorData} The data from which to create the hidden spaces.
+@@ -35,28 +36,28 @@
+ 
+ DoorSets = {
+   Church = {
+-    Main = {55},
+-    Side = {54},
++    Main = {Doors["Door_55"]},
++    Side = {Doors["Door_54"]},
+     Garden = {}
+   },
+   NorthPrison = {
+-    North = {74, 76},
+-    South = {59},
+-    Roof = {74, 75}
++    North = {Doors["Door_74"], Doors["Door_76"]},
++    South = {Doors["Door_59"]},
++    Roof = {Doors["Door_74"], Doors["Door_75"]}
+   },
+   FallGate = {
+     TheOnlyOne = {}
+   },
+   CastleRoom = {
+-    Main = {87, 88},
+-    Tower = {87, 89},
+-    Side = {86},
++    Main = {Doors["Door_87"], Doors["Door_88"]},
++    Tower = {Doors["Door_87"], Doors["Door_89"]},
++    Side = {Doors["Door_86"]},
+     Balcony = {}
+   },
+   SouthPrison = {
+-    Side = {81},
+-    Main = {82},
+-    Roof = {84, 85}
++    Side = {Doors["Door_81"]},
++    Main = {Doors["Door_82"]},
++    Roof = {Doors["Door_84"], Doors["Door_85"]}
+   }
+ }
+ 
+@@ -109,21 +110,21 @@
+ 
+ ChurchRevealMain = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealChurchDoored(DoorSets.Church.Main)
+     end
+   end
+ }
+ ChurchRevealSide = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealChurchDoored(DoorSets.Church.Side)
+     end
+   end
+ }
+ ChurchRevealGarden = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealChurchDoored(DoorSets.Church.Garden)
+     end
+   end
+@@ -132,21 +133,21 @@
+ 
+ PrisonSouthRevealSide = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealPrisonSouthDoored(DoorSets.SouthPrison.Side)
+     end
+   end
+ }
+ PrisonSouthRevealRoof = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealPrisonSouthDoored(DoorSets.SouthPrison.Roof)
+     end
+   end
+ }
+ PrisonSouthRevealMain = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealPrisonSouthDoored(DoorSets.SouthPrison.Main)
+     end
+   end
+@@ -155,14 +156,14 @@
+ 
+ PrisonNorthRevealNorth = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealPrisonNorthDoored(DoorSets.NorthPrison.North)
+     end
+   end
+ }
+ PrisonNorthRevealSouth = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealPrisonNorthDoored(DoorSets.NorthPrison.South)
+     end
+   end
+@@ -171,21 +172,21 @@
+ 
+ CastleRoomRevealMain = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealCastleRoomDoored(DoorSets.CastleRoom.Main)
+     end
+   end
+ }
+ CastleRoomRevealSide = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealCastleRoomDoored(DoorSets.CastleRoom.Side)
+     end
+   end
+ }
+ CastleRoomRevealTower = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealCastleRoomDoored(DoorSets.CastleRoom.Tower)
+     end
+   end
+@@ -194,7 +195,7 @@
+ 
+ FallgateRoomReveal ={
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealFallgateRoomDoored(DoorSets.FallGate.TheOnlyOne)
+     end
+   end
+--- original/lib/seemless/seemlessCommon.lua
++++ migrated/lib/seemless/seemlessCommon.lua
+@@ -1,4 +1,6 @@
+-require("lib/enums")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ local verbose = true
+  
+@@ -7,7 +9,7 @@
+ local GetAllNPCs = function()
+   local NPCs = {}
+   for key, a in pairs(GetAllActors()) do
+-    if IsActorNPC(a) then
++    if a.is_npc then
+       NPCs[key] = a
+     end
+   end
+@@ -16,8 +18,8 @@
+ 
+ local AreDoorsUnlockedOrUnlockable = function (indices)
+   for _, index in pairs(indices) do
+-    local door = GetDoorScript(index)
+-    if (IsDoorLockedPC(door)) and (not IsDoorUnlockable(door)) then
++    local door = index
++    if (door.locked_for_pcs) and (not door.unlockable) then
+       return false
+     end
+   end
+@@ -68,17 +70,17 @@
+     if verbose then
+       print("Activating " .. name)
+     end
+-    Activate(actor)
+-    if IsActorNPC(actor) then
++    actor:Activate()
++    if actor.is_npc then
+       SetCustomNPCValue(actor, NPCValueIndices.UnlockableAI, 0)
+-      UnlockAI(actor)
++      actor:UnlockAi()
+     end
+   else
+     if verbose then
+       print("Deactivating " .. name)
+     end
+-    Deactivate(actor)
+-    if IsActorNPC(actor) then
++    actor:Deactivate()
++    if actor.is_npc then
+       LockAI(actor, false)
+       SetCustomNPCValue(actor, NPCValueIndices.UnlockableAI, 1)
+     end
+@@ -95,7 +97,7 @@
+   local result = {}
+   for key, a in pairs(potentialObjects) do
+     for k2, loc in pairs(locations) do
+-      if IsInside(a, loc) then
++      if a:IsInside(loc) then
+         result[key] = a
+       end
+     end
+@@ -111,9 +113,9 @@
+     end
+     return
+   end
+-  for i = 0,(GetNumberOfPCs()-1) do
+-    local pc = GetPC(i)
+-    if IsActorActive(pc) then
++  for i = 0,(GetNumberOfPcs()-1) do
++    local pc = GetPc(i)
++    if pc.active then
+       local potential = GetObjectsInLocations(where.Interrior, {pc})
+       if #potential > 0 then
+         if where:Reveal({}) then
+@@ -121,7 +123,7 @@
+         end
+       end
+       for _, value in pairs(where.Exterrior) do
+-        if IsInside(pc, value.Zone) then
++        if pc:IsInside(value.Zone) then
+           if(where:Reveal(value.Doors)) then
+             return
+           end
+@@ -137,7 +139,7 @@
+   SetActiveIn(spaceObj, true)
+   if spaceObj.RevealNPCs then
+     for key, a in pairs(spaceObj.Objects) do
+-      if IsActorNPC(a) then
++      if a.is_npc then
+         Reveal(a)
+       end
+     end
+@@ -208,7 +210,7 @@
+     CanHideAtStart = true,
+ 
+     Reveal = function(self, doors)
+-      if not IsPatchApplied(GetPatchScript(self.MainObj.patch)) then
++      if not self.MainObj.patch.applied then
+         if AreDoorsUnlockedOrUnlockable(doors) then
+           if self.Condition() then
+             self.MainObj:Reveal()
+--- original/lib/seemless/yorkSeemless.lua
++++ migrated/lib/seemless/yorkSeemless.lua
+@@ -1,5 +1,6 @@
+-require("lib/seemless/seemlessCommon")
+-require("lib/york")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ ---@return {[string]: HiddenSpace}
+ ---@param data {[string]: InterriorExterriorData} The data from which to create the hidden spaces.
+@@ -33,14 +34,14 @@
+     Main = {},
+   },
+   CastleHall = {
+-    Main = {15},
+-    FromHallway = {17},
+-    TowerTop = {23, 24},
++    Main = {Doors["Door_15"]},
++    FromHallway = {Doors["Door_17"]},
++    TowerTop = {Doors["Door_23"], Doors["Door_24"]},
+     TowerBot = {},
+   },
+   CastleHallway = {
+-    FromMainHall = {17},
+-    Rampart = {16},
++    FromMainHall = {Doors["Door_17"]},
++    Rampart = {Doors["Door_16"]},
+   },
+   FallgateRoom = {
+     TheOnlyOne = {},
+@@ -97,7 +98,7 @@
+ --Zones
+ CathedralRevealMain = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealCathedralDoored(DoorSets.Church.Main)
+     end
+   end
+@@ -105,14 +106,14 @@
+ 
+ CastleHallRevealMain = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealCastleMainHallDoored(DoorSets.CastleHall.Main)
+     end
+   end
+ }
+ CastleHallRevealFromHallway = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealCastleMainHallDoored(DoorSets.CastleHall.FromHallway)
+     end
+   end
+@@ -120,7 +121,7 @@
+ 
+ CastleHallwayRevealRampart = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealCastleHallwayDoored(DoorSets.CastleHallway.Rampart)
+     end
+   end
+@@ -128,7 +129,7 @@
+ 
+ FallGateRoomRevealTheOnlyOne = {
+   Enter = function(actor)
+-    if IsActorPC(actor) then
++    if actor.is_hero then
+       RevealFallGateRoomDoored(DoorSets.FallgateRoom.TheOnlyOne)
+     end
+   end
+--- original/lib/york.lua
++++ migrated/lib/york.lua
+@@ -1,5 +1,6 @@
+-require("lib/common")
+-require("lib/typeDefinitions")
++-- RHMOD MIGRATION: native-API rewrite (SOURCE REVIEW REQUIRED).
++-- FUNCTIONAL CHANGE WARNING: original gameplay has NOT been verified in the new engine.
++-- Every uncertainty and remaining old API call is logged in MIGRATION_AUDIT.md.
+ 
+ MiscPatch = {
+   outerEastGate = 7,
+@@ -42,22 +43,22 @@
+   torchAnimation = 31,
+ 
+   Reveal = function(self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    Activate(GetActor("CastleTreadWheel"))
+-    Activate(GetActorScript(self.torchAnimation))
++    self.patch:Apply()
++    Actors["CastleTreadWheel"]:Activate()
++    self.torchAnimation:Activate()
+   end,
+ 
+   Initialize = function(self)
+-    Deactivate(GetActor("CastleTreadWheel"))
++    Actors["CastleTreadWheel"]:Deactivate()
+   end,
+ 
+   ActivateFallGate = function (self, soundLocation)
+     StartSequence()
+-    SequencePlayAnimFreeze(GetActor("CastleTreadWheel"), 160)
++    SequencePlayAnimFreeze(Actors["CastleTreadWheel"], 160)
+     EndSequence()
+-    MakeNoise(soundLocation, 1)
+-    ApplyPatch(GetPatchScript(self.treadWheel))
+-    ApplyPatch(GetPatchScript(self.fallGate))
++    soundLocation:MakeNoise(1)
++    self.treadWheel:Apply()
++    self.fallGate:Apply()
+   end
+ }
+ 
+@@ -67,29 +68,29 @@
+   doorPatch = 3,
+ 
+   Door = {
+-    entranceWest = 15,
+-    entranceSouth = 17,
+-    tower = 23
++    entranceWest = Doors["Door_15"],
++    entranceSouth = Doors["Door_17"],
++    tower = Doors["Door_23"]
+   },
+ 
+   Animation = {
+-    candles = 1,
+-    chandelier1 = 2,
+-    chandelier2 = 3,
+-    towerTorch = 33,
++    candles = Actors["Animation_1"],
++    chandelier1 = Actors["Animation_2"],
++    chandelier2 = Actors["Animation_3"],
++    towerTorch = Actors["Animation_33"],
+   },
+ 
+   Reveal = function (self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    ApplyPatch(GetPatchScript(self.doorPatch))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.entranceWest))
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.entranceSouth))
+-    ActivateDoorMouseSector(true, GetDoorScript(self.Door.tower))
++    self.patch:Apply()
++    self.doorPatch:Apply()
++    self.Door.entranceWest:SetClickable(false)
++    self.Door.entranceSouth:SetClickable(false)
++    self.Door.tower:SetClickable(true)
+     ActivateAnimations(self.Animation)
+   end,
+ 
+   Initialize = function (self)
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.tower))
++    self.Door.tower:SetClickable(false)
+     DeactivateAnimations(self.Animation)
+   end
+ }
+@@ -99,26 +100,26 @@
+   patch = 2,
+ 
+   Door = {
+-    entranceSouth = 16,
+-    exitNorth = 17
++    entranceSouth = Doors["Door_16"],
++    exitNorth = Doors["Door_17"]
+   },
+ 
+   Animation = {
+-    candles = 0,
+-    torch = 32
++    candles = Actors["Animation_0"],
++    torch = Actors["Animation_32"]
+   },
+ 
+   Reveal = function (self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    if not IsPatchApplied(GetPatchScript(CastleMainHall.patch)) then
+-      ActivateDoorMouseSector(true, GetDoorScript(self.Door.exitNorth))
++    self.patch:Apply()
++    if not CastleMainHall.patch.applied then
++      self.Door.exitNorth:SetClickable(true)
+     end
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.entranceSouth))
++    self.Door.entranceSouth:SetClickable(false)
+     ActivateAnimations(self.Animation)
+   end,
+ 
+   Initialize = function (self)
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.exitNorth))
++    self.Door.exitNorth:SetClickable(false)
+     DeactivateAnimations(self.Animation)
+   end
+ }
+@@ -127,30 +128,30 @@
+ Church = {
+   patch = 6,
+   Door = {
+-    sideRoom = 122,
++    sideRoom = Doors["Door_122"],
+   },
+ 
+   Animation = {
+-    candles1 = 4,
+-    candles2 = 5,
+-    candles3 = 6,
+-    candles4 = 7,
+-    candles5 = 8,
+-    candles6 = 9,
+-    candles7 = 10,
+-    candles8 = 11,
+-    candles9 = 12,
+-    candles10 = 13,
++    candles1 = Actors["Animation_4"],
++    candles2 = Actors["Animation_5"],
++    candles3 = Actors["Animation_6"],
++    candles4 = Actors["Animation_7"],
++    candles5 = Actors["Animation_8"],
++    candles6 = Actors["Animation_9"],
++    candles7 = Actors["Animation_10"],
++    candles8 = Actors["Animation_11"],
++    candles9 = Actors["Animation_12"],
++    candles10 = Actors["Animation_13"],
+   },
+ 
+   Reveal = function (self)
+-    ApplyPatch(GetPatchScript(self.patch))
+-    ActivateDoorMouseSector(true, GetDoorScript(self.Door.sideRoom))
++    self.patch:Apply()
++    self.Door.sideRoom:SetClickable(true)
+     ActivateAnimations(self.Animation)
+   end,
+ 
+   Initialize = function (self)
+-    ActivateDoorMouseSector(false, GetDoorScript(self.Door.sideRoom))
++    self.Door.sideRoom:SetClickable(false)
+     DeactivateAnimations(self.Animation)
+   end
+ }
